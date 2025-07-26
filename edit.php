@@ -1,86 +1,60 @@
 <?php
-// File: edit_post.php
-session_start();
 include 'config/db_connect.php';
 
-
 if (!isset($_SESSION['user_id'])) {
-  header("Location: login.php");
-  exit();
+    header("Location: login.php");
+    exit;
 }
 
 if (!isset($_GET['id'])) {
-  header("Location: dashboard.php");
-  exit();
+    header("Location: dashboard.php");
+    exit;
 }
 
-$id = $_GET['id'];
+$post_id = $_GET['id'];
 $user_id = $_SESSION['user_id'];
 
 // Fetch post
-$query = "SELECT * FROM posts WHERE id = $id AND user_id = $user_id";
-$result = mysqli_query($conn, $query);
-if (mysqli_num_rows($result) !== 1) {
-  die("Post not found or not authorized.");
-}
-$post = mysqli_fetch_assoc($result);
+$stmt = $pdo->prepare("SELECT * FROM posts WHERE post_id = ? AND user_id = ?");
+$stmt->execute([$post_id, $user_id]);
+$post = $stmt->fetch();
 
-if (isset($_POST['update'])) {
-  $title = mysqli_real_escape_string($conn, $_POST['title']);
-  $content = mysqli_real_escape_string($conn, $_POST['content']);
-  $update = "UPDATE posts SET title = '$title', content = '$content' WHERE id = $id AND user_id = $user_id";
-  mysqli_query($conn, $update);
-  header("Location: dashboard.php");
+if (!$post) {
+    header("Location: dashboard.php");
+    exit;
+}
+
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $title = trim(strip_tags($_POST['title'] ?? ''));
+    $content = trim(strip_tags($_POST['content'] ?? ''));
+    $status = trim(strip_tags($_POST['status'] ?? 'draft'));
+    
+    $stmt = $pdo->prepare("UPDATE posts SET title = ?, content = ?, status = ? WHERE post_id = ? AND user_id = ?");
+    $stmt->execute([$title, $content, $status, $post_id, $user_id]);
+    
+    header("Location: dashboard.php");
+    exit;
 }
 ?>
-
-<div class="container mt-4">
-  <h2>Edit Post</h2>
-  <form method="POST">
-    <input type="text" name="title" class="form-control mb-3" value="<?= htmlspecialchars($post['title']) ?>" required>
-    <textarea name="content" rows="5" class="form-control mb-3" required><?= htmlspecialchars($post['content']) ?></textarea>
-    <button type="submit" name="update" class="btn btn-primary">Update</button>
-  </form>
-</div>
-
-<?php
-// File: delete_post.php
-session_start();
-include 'config/db.php';
-
-if (!isset($_SESSION['user_id']) || !isset($_GET['id'])) {
-  header("Location: login.php");
-  exit();
-}
-
-$id = $_GET['id'];
-$user_id = $_SESSION['user_id'];
-
-$delete = "DELETE FROM posts WHERE id = $id AND user_id = $user_id";
-mysqli_query($conn, $delete);
-header("Location: dashboard.php");
-?>
-
-<?php
-// File: like_post.php
-session_start();
-include 'config/db.php';
-
-if (!isset($_SESSION['user_id'])) {
-  header("Location: login.php");
-  exit();
-}
-
-$post_id = $_POST['post_id'];
-$user_id = $_SESSION['user_id'];
-
-$check = mysqli_query($conn, "SELECT * FROM likes WHERE post_id = $post_id AND user_id = $user_id");
-if (mysqli_num_rows($check) > 0) {
-  // Unlike
-  mysqli_query($conn, "DELETE FROM likes WHERE post_id = $post_id AND user_id = $user_id");
-} else {
-  // Like
-  mysqli_query($conn, "INSERT INTO likes (post_id, user_id) VALUES ($post_id, $user_id)");
-}
-header("Location: view_post.php?id=$post_id");
-?>
+<?php include 'includes/header.php'; ?>
+<h2>Edit Post</h2>
+<form method="POST">
+    <div class="mb-3">
+        <label for="title" class="form-label">Title</label>
+        <input type="text" class="form-control" id="title" name="title" value="<?php echo htmlspecialchars($post['title']); ?>" required>
+    </div>
+    <div class="mb-3">
+        <label for="content" class="form-label">Content</label>
+        <textarea class="form-control" id="content" name="content" rows="5" required><?php echo htmlspecialchars($post['content']); ?></textarea>
+    </div>
+    <div class="mb-3">
+        <label for="status" class="form-label">Status</label>
+        <select class="form-select" id="status" name="status">
+            <option value="published" <?php echo $post['status'] == 'published' ? 'selected' : ''; ?>>Published</option>
+            <option value="draft" <?php echo $post['status'] == 'draft' ? 'selected' : ''; ?>>Draft</option>
+        </select>
+    </div>
+    <button type="submit" class="btn btn-primary">Update Post</button>
+    <a href="dashboard.php" class="btn btn-secondary">Cancel</a>
+</form>
+<?php include 'includes/footer.php'; ?>

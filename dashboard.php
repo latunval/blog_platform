@@ -83,7 +83,7 @@ $posts = $stmt->fetchAll();
                 <td><?php echo $post['status']; ?></td>
                 <td>
                     <a href="view_post.php?id=<?php echo $post['post_id']; ?>" class="btn btn-sm btn-primary">View</a>
-                    <a href="create_post.php?id=<?php echo $post['post_id']; ?>" class="btn btn-sm btn-warning">Edit</a>
+                    <a href="edit.php?id=<?php echo $post['post_id']; ?>" class="btn btn-sm btn-warning">Edit</a>
                     <a href="delete_post.php?id=<?php echo $post['post_id']; ?>" class="btn btn-sm btn-danger" onclick="return confirm('Are you sure?')">Delete</a>
                 </td>
             </tr>

@@ -25,7 +25,12 @@ if (isset($_SESSION['user_id'])) {
     $user_liked_post = $stmt->fetch() !== false;
 }
 
-// Get comments
+// Get comments and count
+$stmt = $pdo->prepare("SELECT COUNT(*) as comment_count FROM comments WHERE post_id = ?");
+$stmt->execute([$post['post_id']]);
+$comment_count = $stmt->fetch()['comment_count'];
+
+// Get all comments with user information
 $stmt = $pdo->prepare("SELECT comments.*, users.username FROM comments JOIN users ON comments.user_id = users.user_id WHERE post_id = ? ORDER BY created_at");
 $stmt->execute([$post['post_id']]);
 $comments = $stmt->fetchAll();
@@ -34,16 +39,26 @@ $comments = $stmt->fetchAll();
 <h2><?php echo htmlspecialchars($post['title']); ?></h2>
 <p>By: <?php echo htmlspecialchars($post['username']); ?> | <?php echo $post['created_at']; ?></p>
 <p><?php echo nl2br(htmlspecialchars($post['content'])); ?></p>
-<p>Likes: <?php echo $post_likes; ?></p>
+
+<div class="post-likes-section">
+    <p id="post-likes-count">Likes: <?php echo $post_likes; ?></p>
+    <?php if (isset($_SESSION['user_id'])): ?>
+        <form action="interact.php" method="POST" class="like-form">
+            <input type="hidden" name="action" value="like">
+            <input type="hidden" name="post_id" value="<?php echo $post['post_id']; ?>">
+            <button type="submit" class="btn btn-sm btn-primary like-btn" data-liked="<?php echo $user_liked_post ? 'true' : 'false'; ?>">
+                <?php echo $user_liked_post ? 'Unlike' : 'Like'; ?>
+            </button>
+        </form>
+    <?php endif; ?>
+</div>
+
+<p id="comment-count">Comments: <?php echo $comment_count; ?></p>
+
 <?php if (isset($_SESSION['user_id'])): ?>
-    <form action="like.php" method="POST">
-        <input type="hidden" name="post_id" value="<?php echo $post['post_id']; ?>">
-        <button type="submit" class="btn btn-sm btn-primary like-btn" data-liked="<?php echo $user_liked_post ? 'true' : 'false'; ?>">
-            <?php echo $user_liked_post ? 'Unlike' : 'Like'; ?>
-        </button>
-    </form>
     <h4 class="mt-4">Add Comment</h4>
-    <form id="comment-form" method="POST">
+    <form id="comment-form" action="interact.php" method="POST">
+        <input type="hidden" name="action" value="comment">
         <input type="hidden" name="post_id" value="<?php echo $post['post_id']; ?>">
         <div class="mb-3">
             <textarea class="form-control" name="content" rows="3" required></textarea>
@@ -51,33 +66,40 @@ $comments = $stmt->fetchAll();
         <button type="submit" class="btn btn-primary">Comment</button>
     </form>
 <?php endif; ?>
+
 <h4 class="mt-4">Comments</h4>
 <div id="comment-section">
     <?php foreach ($comments as $comment): ?>
+        <?php
+        $stmt = $pdo->prepare("SELECT COUNT(*) as like_count FROM likes WHERE comment_id = ?");
+        $stmt->execute([$comment['comment_id']]);
+        $comment_likes = $stmt->fetch()['like_count'];
+
+        $user_liked_comment = false;
+        if (isset($_SESSION['user_id'])) {
+            $stmt = $pdo->prepare("SELECT * FROM likes WHERE user_id = ? AND comment_id = ?");
+            $stmt->execute([$_SESSION['user_id'], $comment['comment_id']]);
+            $user_liked_comment = $stmt->fetch() !== false;
+        }
+        ?>
         <div class="comment">
-            <p><strong><?php echo htmlspecialchars($comment['username']); ?>:</strong> <?php echo htmlspecialchars($comment['content']); ?></p>
-            <p>
-                <?php
-                $stmt = $pdo->prepare("SELECT COUNT(*) as like_count FROM likes WHERE comment_id = ?");
-                $stmt->execute([$comment['comment_id']]);
-                $comment_likes = $stmt->fetch()['like_count'];
-                ?>
-                Likes: <?php echo $comment_likes; ?>
-            </p>
-            <?php if (isset($_SESSION['user_id'])): ?>
-                <?php
-                $stmt = $pdo->prepare("SELECT * FROM likes WHERE user_id = ? AND comment_id = ?");
-                $stmt->execute([$_SESSION['user_id'], $comment['comment_id']]);
-                $user_liked_comment = $stmt->fetch() !== false;
-                ?>
-                <form action="like.php" method="POST">
-                    <input type="hidden" name="comment_id" value="<?php echo $comment['comment_id']; ?>">
-                    <input type="hidden" name="post_id" value="<?php echo $post['post_id']; ?>">
-                    <button type="submit" class="btn btn-sm btn-primary like-btn" data-liked="<?php echo $user_liked_comment ? 'true' : 'false'; ?>">
-                        <?php echo $user_liked_comment ? 'Unlike' : 'Like'; ?>
-                    </button>
-                </form>
-            <?php endif; ?>
+            <p><strong><?php echo htmlspecialchars($comment['username']); ?></strong> says:</p>
+            <p><?php echo nl2br(htmlspecialchars($comment['content'])); ?></p>
+            <p><small><?php echo $comment['created_at']; ?></small></p>
+            
+            <div class="comment-likes-section">
+                <p class="comment-likes-count" data-comment-id="<?php echo $comment['comment_id']; ?>">Likes: <?php echo $comment_likes; ?></p>
+                <?php if (isset($_SESSION['user_id'])): ?>
+                    <form action="interact.php" method="POST" class="like-form">
+                        <input type="hidden" name="action" value="like">
+                        <input type="hidden" name="comment_id" value="<?php echo $comment['comment_id']; ?>">
+                        <input type="hidden" name="post_id" value="<?php echo $post['post_id']; ?>">
+                        <button type="submit" class="btn btn-sm btn-primary like-btn" data-liked="<?php echo $user_liked_comment ? 'true' : 'false'; ?>">
+                            <?php echo $user_liked_comment ? 'Unlike' : 'Like'; ?>
+                        </button>
+                    </form>
+                <?php endif; ?>
+            </div>
         </div>
     <?php endforeach; ?>
 </div>
